@@ -54,3 +54,30 @@ module Delayer : Delayer_intf = struct
     Lwt.on_termination (Lwt_unix.sleep t.delay) (Queue.take t.jobs);
     waiter
 end
+
+
+(* Example: An Echo Server *)
+
+let rec copy_blocks (buffer : bytes) (r : Lwt_io.input_channel) (w : Lwt_io.output_channel) : unit Lwt.t =
+  match%lwt Lwt_io.read_into r buffer 0 (Bytes.length buffer) with
+  | 0 -> Lwt.return_unit
+  | bytes_read ->
+    Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
+
+let run () : unit =
+  ((let%lwt server =
+      Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, 8765))
+        (fun (r, w) ->
+           let buffer = Bytes.create (16 * 1024) in
+           copy_blocks buffer r w)
+    in
+    Lwt.return server) : Lwt_io.server Lwt.t) |> ignore
+
+let never_terminate : 'a . 'a Lwt.t = fst (Lwt.wait ())
+
+let () =
+  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  run ();
+  Lwt_main.run never_terminate

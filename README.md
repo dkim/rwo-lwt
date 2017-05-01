@@ -193,6 +193,45 @@ module Delayer : Delayer_intf
 ```
 
 
+## Examples: An Echo Server
+
+#### OCaml
+
+```ocaml
+let rec copy_blocks buffer r w =
+  match%lwt Lwt_io.read_into r buffer 0 (Bytes.length buffer) with
+  | 0 -> Lwt.return_unit
+  | bytes_read ->
+    Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
+```
+
+#### OCaml (part 1)
+
+```ocaml
+let run () =
+  ((let%lwt server =
+      Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, 8765))
+        (fun (r, w) ->
+           let buffer = Bytes.create (16 * 1024) in
+           copy_blocks buffer r w)
+    in
+    Lwt.return server) : Lwt_io.server Lwt.t) |> ignore
+```
+
+#### OCaml (part 2)
+
+```ocaml
+let never_terminate = fst (Lwt.wait ())
+
+let () =
+  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  run ();
+  Lwt_main.run never_terminate
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
