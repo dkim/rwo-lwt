@@ -1,0 +1,21 @@
+true: package(lwt.unix), package(lwt.ppx)
+
+# Save typedtree in <filename>.cmt.
+<**/*.ml>: bin_annot
+# # Save debugging information.
+true: debug
+# Check principality of type inference
+true: principal
+# Make strings immutable.
+true: safe_string
+# Reject invalid formats accepted by legacy implementations.
+true: strict_formats
+# Left-hand part of a sequence must have type unit.
+true: strict_sequence
+#  4 Fragile pattern matching: matching that will remain complete even if
+#    additional constructors are added to one of the variant types matched.
+# 42 Disambiguated constructor or label name (compatibility warning).
+true: warn(+A-4-42)
+
+# Enable colors in compiler messages (especially warnings and errors).
+true: color(always)

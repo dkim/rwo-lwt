@@ -1,0 +1,17 @@
+#principal true;;
+(* 41 Ambiguous constructor or label name. *)
+#warnings "+41";;
+
+(* OPAM *)
+let () =
+  try Topdirs.dir_directory (Sys.getenv "OCAML_TOPLEVEL_PATH")
+  with Not_found -> ();;
+
+(* Findlib *)
+#use "topfind";;
+(* #topfind_verbose true;; *)
+
+#require "lwt.unix";;
+#require "lwt.ppx";;
+
+#utop_prompt_dummy;;

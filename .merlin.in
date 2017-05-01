@@ -1,0 +1,13 @@
+S src
+B _build/src
+
+PKG lwt.unix lwt.ppx
+S %{prefix}%/build/lwt.*/_build/src/*
+
+# Shorten paths in types.
+FLG -short-paths
+
+#  4 Fragile pattern matching: matching that will remain complete even if
+#    additional constructors are added to one of the variant types matched.
+# 42 Disambiguated constructor or label name (compatibility warning).
+FLG -w +A-4-42
