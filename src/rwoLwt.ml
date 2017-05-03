@@ -136,3 +136,6 @@ let () =
   (try Lwt_engine.set (new Lwt_engine.libev ())
    with Lwt_sys.Not_available _ -> ());
   Lwt_main.run (run !uppercase !port)
+
+
+(* Example: Searching Definitions with DuckDuckGo *)

@@ -294,6 +294,13 @@ let run uppercase port =
 ```
 
 
+## Example: Searching Definitions with DuckDuckGo
+
+```bash
+$ opam install tls cohttp       # Or opam install lwt_ssl cohttp
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
