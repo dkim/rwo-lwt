@@ -127,6 +127,72 @@ val count_lines : string -> int Lwt.t = <fun>
 As with `Lwt.bind`, I will use the combination of the `let%lwt` construct and the `Lwt.return` function rather than `Lwt.map`.<sup>\[[1](#backtrace)\]</sup>
 
 
+### Ivars and Upon
+
+#### OCalm utop (part 15)
+
+```ocaml
+# let waiter, wakener = Lwt.wait ();;
+val waiter : '_a Lwt.t = <abstr>
+val wakener : '_a Lwt.u = <abstr>
+# Lwt.state waiter;;
+- : '_a Lwt.state = Lwt.Sleep
+# Lwt.wakeup wakener  "Hello";;
+- : unit = ()
+# Lwt.state waiter;;
+- : string Lwt.state = Lwt.Return "Hello"
+```
+
+#### OCaml utop (part 16)
+
+```ocaml
+# module type Delayer_intf = sig
+    type t
+    val create : float -> t
+    val schedule : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  end;;
+module type Delayer_intf =
+  sig
+    type t
+    val create : float -> t
+    val schedule : t -> (unit -> 'a Lwt.t) -> 'a Lwt.t
+  end
+```
+
+#### OCaml utop (part 17)
+
+```ocaml
+# Lwt.on_success;;
+- : 'a Lwt.t -> ('a -> unit) -> unit = <fun>
+# Lwt.on_failure;;
+- : 'a Lwt.t -> (exn -> unit) -> unit = <fun>
+# Lwt.on_termination;;
+- : 'a Lwt.t -> (unit -> unit) -> unit = <fun>
+# Lwt.on_any;;
+- : 'a Lwt.t -> ('a -> unit) -> (exn -> unit) -> unit = <fun>
+```
+
+#### OCaml utop (part 18)
+
+```ocaml
+# module Delayer : Delayer_intf = struct
+    type t = {delay: float; jobs: (unit -> unit) Queue.t}
+
+    let create delay = {delay; jobs = Queue.create ()}
+
+    let schedule t thunk =
+      let waiter, wakener = Lwt.wait () in
+      Queue.add
+        (fun () ->
+           Lwt.on_any (thunk ()) (Lwt.wakeup wakener) (Lwt.wakeup_exn wakener))
+        t.jobs;
+      Lwt.on_termination (Lwt_unix.sleep t.delay) (Queue.take t.jobs);
+      waiter
+  end;;
+module Delayer : Delayer_intf
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
