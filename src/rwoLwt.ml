@@ -64,6 +64,7 @@ let rec copy_blocks (buffer : bytes) (r : Lwt_io.input_channel) (w : Lwt_io.outp
   | bytes_read ->
     Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
 
+(*
 let run () : unit =
   ((let%lwt server =
       Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, 8765))
@@ -72,12 +73,66 @@ let run () : unit =
            copy_blocks buffer r w)
     in
     Lwt.return server) : Lwt_io.server Lwt.t) |> ignore
+*)
 
 let never_terminate : 'a . 'a Lwt.t = fst (Lwt.wait ())
 
+(*
 let () =
   Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
   (try Lwt_engine.set (new Lwt_engine.libev ())
    with Lwt_sys.Not_available _ -> ());
   run ();
   Lwt_main.run never_terminate
+*)
+
+
+(* Improving the Echo Server *)
+
+let run (uppercase : bool) (port : int) : unit Lwt.t =
+  let%lwt server =
+    Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, port))
+      (fun (r, w) ->
+         Lwt_io.read_chars r
+         |> (if uppercase then Lwt_stream.map Char.uppercase_ascii
+             else fun x -> x)
+         |> Lwt_io.write_chars w)
+  in
+  (server : Lwt_io.server) |> ignore;
+  never_terminate
+
+(*
+let run (uppercase : bool) (port : int) : unit Lwt.t =
+  let%lwt server =
+    Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, port))
+      (fun (r, w) ->
+         let reader = Lwt_pipe.IO.read r in
+         let writer =
+           Lwt_pipe.IO.write w
+           |> (if uppercase then Lwt_pipe.Writer.map ~f:String.uppercase_ascii
+               else fun x -> x)
+         in
+         Lwt_pipe.connect ~ownership:`OutOwnsIn reader writer;
+         Lwt_pipe.wait writer)
+  in
+  (server : Lwt_io.server) |> ignore;
+  never_terminate
+*)
+
+let () =
+  let uppercase = ref false
+  and port = ref 8765 in
+  let options = [
+    "-uppercase", Arg.Set uppercase, "Convert to uppercase before echoing back";
+    "-port", Arg.Set_int port, "Port to listen on (default 8765)";
+  ] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-uppercase] [-port num]" in
+  Arg.parse
+    options
+    (fun arg -> raise (Arg.Bad (Printf.sprintf "invalid argument -- '%s'" arg)))
+    usage;
+
+  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (run !uppercase !port)

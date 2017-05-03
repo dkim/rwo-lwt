@@ -232,6 +232,68 @@ let () =
 ```
 
 
+### Improving the Echo Server
+
+#### OCaml
+
+```ocaml
+let run uppercase port =
+  let%lwt server =
+    Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, port))
+      (fun (r, w) ->
+         Lwt_io.read_chars r
+         |> (if uppercase then Lwt_stream.map Char.uppercase_ascii
+             else fun x -> x)
+         |> Lwt_io.write_chars w)
+  in
+  (server : Lwt_io.server) |> ignore;
+  never_terminate
+
+let () =
+  let uppercase = ref false
+  and port = ref 8765 in
+  let options = [
+    "-uppercase", Arg.Set uppercase, "Convert to uppercase before echoing back";
+    "-port", Arg.Set_int port, "Port to listen on (default 8765)";
+  ] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-uppercase] [-port num]" in
+  Arg.parse
+    options
+    (fun arg -> raise (Arg.Bad (Printf.sprintf "invalid argument -- '%s'" arg)))
+    usage;
+
+  Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (run !uppercase !port)
+```
+
+[The Lwt manual](https://ocsigen.org/lwt/3.0.0/api/Lwt_stream) states that the `Lwt_stream` module may get deprecated or redesigned, and suggests considering alternatives, such as Simon Cruanes's [lwt-pipe](https://github.com/c-cube/lwt-pipe). Below is an equivalent version of the code above that uses lwt-pipe.
+
+```bash
+$ opam pin add -k git lwt-pipe https://github.com/c-cube/lwt-pipe.git
+$ opam install lwt-pipe
+```
+
+```ocaml
+let run uppercase port =
+  let%lwt server =
+    Lwt_io.establish_server (Lwt_unix.ADDR_INET (Unix.inet_addr_any, port))
+      (fun (r, w) ->
+         let reader = Lwt_pipe.IO.read r in
+         let writer =
+           Lwt_pipe.IO.write w
+           |> (if uppercase then Lwt_pipe.Writer.map ~f:String.uppercase_ascii
+               else fun x -> x)
+         in
+         Lwt_pipe.connect ~ownership:`OutOwnsIn reader writer;
+         Lwt_pipe.wait writer)
+  in
+  (server : Lwt_io.server) |> ignore;
+  never_terminate
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
