@@ -139,3 +139,9 @@ let () =
 
 
 (* Example: Searching Definitions with DuckDuckGo *)
+
+(* URI Handling *)
+
+let query_uri : string -> Uri.t =
+  let base_uri = Uri.of_string "https://api.duckduckgo.com/?format=json" in
+  (fun query -> Uri.add_query_param base_uri ("q", [query]))

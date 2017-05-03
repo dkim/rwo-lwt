@@ -301,6 +301,17 @@ $ opam install tls cohttp       # Or opam install lwt_ssl cohttp
 ```
 
 
+### URI Handling
+
+#### OCaml
+
+```ocaml
+let query_uri =
+  let base_uri = Uri.of_string "https://api.duckduckgo.com/?format=json" in
+  (fun query -> Uri.add_query_param base_uri ("q", [query]))
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.

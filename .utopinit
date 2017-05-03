@@ -14,4 +14,6 @@ let () =
 #require "lwt.unix";;
 #require "lwt.ppx";;
 
+#require "uri";;
+
 #utop_prompt_dummy;;

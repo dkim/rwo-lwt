@@ -4,6 +4,9 @@ B _build/src
 PKG lwt.unix lwt.ppx
 S %{prefix}%/build/lwt.*/_build/src/*
 
+PKG uri
+S %{prefix}%/build/uri.*/_build/lib
+
 # Shorten paths in types.
 FLG -short-paths
 

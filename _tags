@@ -1,4 +1,5 @@
 true: package(lwt.unix), package(lwt.ppx)
+true: package(uri)
 
 # Save typedtree in <filename>.cmt.
 <**/*.ml>: bin_annot
