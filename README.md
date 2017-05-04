@@ -417,6 +417,84 @@ let () =
 ```
 
 
+## Exception Handling
+
+#### OCaml utop (part 31)
+
+```ocaml
+# let maybe_raise =
+    let should_fail = ref false in
+    fun () ->
+      let will_fail = !should_fail in
+      should_fail := not will_fail;
+      Lwt_unix.sleep 0.5 >>
+      if will_fail then [%lwt raise Exit] else Lwt.return_unit;;
+val maybe_raise : unit -> unit Lwt.t = <fun>
+# maybe_raise ();;
+- : unit = ()
+# maybe_raise ();;
+Exception: Pervasives.Exit.
+Raised at file "src/core/lwt.ml", line 805, characters 22-23
+Called from file "src/unix/lwt_main.ml", line 34, characters 8-18
+Called from file "toplevel/toploop.ml", line 180, characters 17-56
+```
+
+Note that I wrote `[%lwt raise Exit]` rather than `Lwt.fail Exit`. The Lwt manual states that the former will produce better backtraces than the latter <sup>\[[1](#backtrace)\]</sup>:
+
+> It allows to encode the old `raise_lwt <e>` as `[%lwt raise <e>]`, ...
+>
+> \- https://ocsigen.org/lwt/3.0.0/api/Ppx_lwt
+
+> `raise_lwt exn`
+>
+> which is the same as Lwt.fail exn but with backtrace support.
+>
+> \- https://ocsigen.org/lwt/3.0.0/manual/
+
+#### OCaml utop (part 32)
+
+```ocaml
+# let handle_error () =
+    try
+      maybe_raise () >> Lwt.return "success"
+    with _ -> Lwt.return "failure";;
+val handle_error : unit -> string Lwt.t = <fun>
+# handle_error ();;
+- : string = "success"
+# handle_error ();;
+Exception: Pervasives.Exit.
+Raised at file "src/core/lwt.ml", line 805, characters 22-23
+Called from file "src/unix/lwt_main.ml", line 34, characters 8-18
+Called from file "toplevel/toploop.ml", line 180, characters 17-56
+```
+
+#### OCaml utop (part 33)
+
+```ocaml
+# let handle_error () =
+    try%lwt
+      maybe_raise () >> Lwt.return "success"
+    with _ -> Lwt.return "failure";;
+val handle_error : unit -> string Lwt.t = <fun>
+# handle_error ();;
+- : string = "success"
+# handle_error ();;
+- : string = "failure"
+```
+
+Although the manual does not state it explicitly, `try%lwt ... with ...` appears to be intended to provide a better backtrace than `Lwt.catch`.<sup>\[[1](#backtrace)\]</sup> For instance, the `handle_error` function is expanded to:
+
+```ocaml
+let handle_error () =
+  Lwt.backtrace_catch (fun exn  -> try raise exn with | exn -> exn)
+    (fun ()  ->
+       Lwt.backtrace_bind (fun exn  -> try raise exn with | exn -> exn)
+         (maybe_raise ())
+         (fun ()  -> Lwt.return "success"))
+    (function | _ -> Lwt.return "failure")
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
