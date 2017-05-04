@@ -16,4 +16,6 @@ let () =
 
 #require "uri";;
 
+#require "yojson";;
+
 #utop_prompt_dummy;;

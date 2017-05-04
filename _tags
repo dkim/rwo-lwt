@@ -1,5 +1,6 @@
 true: package(lwt.unix), package(lwt.ppx)
 true: package(uri)
+true: package(yojson)
 
 # Save typedtree in <filename>.cmt.
 <**/*.ml>: bin_annot

@@ -312,6 +312,29 @@ let query_uri =
 ```
 
 
+### Parsing JSON Strings
+
+#### OCaml (part 1)
+
+```ocaml
+let get_definition_from_json json =
+  match Yojson.Safe.from_string json with
+  | `Assoc kv_list ->
+    let find key =
+      try
+        match List.assoc key kv_list with
+        | `String "" -> None
+        | s -> Some (Yojson.Safe.to_string s)
+      with Not_found -> None
+    in
+    begin match find "Abstract" with
+    | Some _ as x -> x
+    | None -> find "Definition"
+    end
+  | _ -> None
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.

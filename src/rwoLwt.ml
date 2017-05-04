@@ -145,3 +145,22 @@ let () =
 let query_uri : string -> Uri.t =
   let base_uri = Uri.of_string "https://api.duckduckgo.com/?format=json" in
   (fun query -> Uri.add_query_param base_uri ("q", [query]))
+
+
+(* Parsing JSON Strings *)
+
+let get_definition_from_json (json : string) : string option =
+  match Yojson.Safe.from_string json with
+  | `Assoc kv_list ->
+    let find key =
+      try
+        match List.assoc key kv_list with
+        | `String "" -> None
+        | s -> Some (Yojson.Safe.to_string s)
+      with Not_found -> None
+    in
+    begin match find "Abstract" with
+    | Some _ as x -> x
+    | None -> find "Definition"
+    end
+  | _ -> None
