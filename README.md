@@ -335,6 +335,88 @@ let get_definition_from_json json =
 ```
 
 
+### Executing an HTTP Client Query
+
+#### OCaml (part 2)
+
+```ocaml
+let get_definition word =
+  let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri word) in
+  let%lwt body' = Cohttp_lwt_body.to_string body in
+  Lwt.return (word, get_definition_from_json body')
+```
+
+#### OCaml utop (part 28)
+
+```ocaml
+# #require "cohttp.lwt";;
+# Cohttp_lwt_unix.Client.get;;
+- : ?ctx:Cohttp_lwt_unix.Client.ctx -> ?headers:Cohttp.Header.t -> Uri.t -> (Cohttp_lwt.Response.t * Cohttp_lwt_body.t) Lwt.t = <fun>
+```
+
+#### OCaml (part 3)
+
+```ocaml
+let print_result (word, definition) =
+  Lwt_io.printf "%s\n%s\n\n%s\n\n"
+    word
+    (String.init (String.length word) (fun _ -> '-'))
+    (match definition with
+     | None -> "No definition found"
+     | Some def ->
+       Format.pp_set_margin Format.str_formatter 70;
+       Format.pp_print_text Format.str_formatter def;
+       Format.flush_str_formatter ())
+```
+
+#### OCaml (part 4)
+
+```ocaml
+let search_and_print words =
+  let%lwt results = Lwt_list.map_p get_definition words in
+  Lwt_list.iter_s print_result results
+```
+
+#### OCaml utop (part 29)
+
+```ocaml
+# Lwt_list.map_p;;
+- : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t = <fun>
+```
+
+#### OCaml (part 1)
+
+```ocaml
+let search_and_print words =
+  Lwt_list.iter_p
+    (fun word ->
+       let%lwt result = get_definition word in
+       print_result result)
+    words
+```
+
+#### OCaml utop (part 30)
+
+```ocaml
+# Lwt_list.iter_p;;
+- : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t = <fun>
+```
+
+#### OCaml (part 5)
+
+```ocaml
+let () =
+  let words = ref [] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [word ...]" in
+  Arg.parse [] (fun w -> words := w :: !words) usage;
+  words := List.rev !words;
+
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (search_and_print !words)
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.

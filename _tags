@@ -1,5 +1,5 @@
-true: package(lwt.unix), package(lwt.ppx)
-true: package(uri)
+true: package(cohttp.lwt)
+true: package(lwt.ppx)
 true: package(yojson)
 
 # Save typedtree in <filename>.cmt.

@@ -11,10 +11,9 @@ let () =
 #use "topfind";;
 (* #topfind_verbose true;; *)
 
-#require "lwt.unix";;
-#require "lwt.ppx";;
+#require "cohttp.lwt";;
 
-#require "uri";;
+#require "lwt.ppx";;
 
 #require "yojson";;
 

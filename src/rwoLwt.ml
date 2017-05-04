@@ -119,6 +119,7 @@ let run (uppercase : bool) (port : int) : unit Lwt.t =
   never_terminate
 *)
 
+(*
 let () =
   let uppercase = ref false
   and port = ref 8765 in
@@ -136,6 +137,7 @@ let () =
   (try Lwt_engine.set (new Lwt_engine.libev ())
    with Lwt_sys.Not_available _ -> ());
   Lwt_main.run (run !uppercase !port)
+*)
 
 
 (* Example: Searching Definitions with DuckDuckGo *)
@@ -164,3 +166,45 @@ let get_definition_from_json (json : string) : string option =
     | None -> find "Definition"
     end
   | _ -> None
+
+
+(* Executing an HTTP Client Query *)
+
+let get_definition (word : string) : (string * string option) Lwt.t =
+  let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri word) in
+  let%lwt body' = Cohttp_lwt_body.to_string body in
+  Lwt.return (word, get_definition_from_json body')
+
+let print_result ((word, definition) : string * string option) : unit Lwt.t =
+  Lwt_io.printf "%s\n%s\n\n%s\n\n"
+    word
+    (String.init (String.length word) (fun _ -> '-'))
+    (match definition with
+     | None -> "No definition found"
+     | Some def ->
+       Format.pp_set_margin Format.str_formatter 70;
+       Format.pp_print_text Format.str_formatter def;
+       Format.flush_str_formatter ())
+
+let search_and_print (words : string list) : unit Lwt.t =
+  let%lwt results = Lwt_list.map_p get_definition words in
+  Lwt_list.iter_s print_result results
+
+(*
+let search_and_print (words : string list) : unit Lwt.t =
+  Lwt_list.iter_p
+    (fun word ->
+       let%lwt result = get_definition word in
+       print_result result)
+    words
+*)
+
+let () =
+  let words = ref [] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [word ...]" in
+  Arg.parse [] (fun w -> words := w :: !words) usage;
+  words := List.rev !words;
+
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (search_and_print !words)
