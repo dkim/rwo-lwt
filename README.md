@@ -500,6 +500,75 @@ let handle_error () =
 Lwt does not have a concept corresponding to a monitor.
 
 
+### Example: Handling Exceptions with DuckDuckGo
+
+#### OCaml (part 1)
+
+```ocaml
+let query_uri ~server query =
+  let base_uri =
+    Uri.of_string (String.concat "" ["https://"; server; "/?format=json"])
+  in
+  Uri.add_query_param base_uri ("q", [query])
+```
+
+#### OCaml (part 1)
+
+```ocaml
+let get_definition ~server word =
+  try%lwt
+    let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri ~server word) in
+    let%lwt body' = Cohttp_lwt_body.to_string body in
+    Lwt.return (word, Ok (get_definition_from_json body'))
+  with _ -> Lwt.return (word, Error "Unexpected failure")
+```
+
+#### OCaml (part 2)
+
+```ocaml
+let print_result (word, definition) =
+  Lwt_io.printf "%s\n%s\n\n%s\n\n"
+    word
+    (String.init (String.length word) (fun _ -> '-'))
+    (match definition with
+     | Error s -> "DuckDuckGo query failed: " ^ s
+     | Ok None -> "No definition found"
+     | Ok (Some def) ->
+       Format.pp_set_margin Format.str_formatter 70;
+       Format.pp_print_text Format.str_formatter def;
+       Format.flush_str_formatter ())
+```
+
+```ocaml
+let search_and_print ~servers words =
+  let servers = Array.of_list servers in
+  let%lwt results =
+    Lwt_list.mapi_p
+      (fun i word ->
+         let server = servers.(i mod Array.length servers) in
+         get_definition ~server word)
+      words
+  in
+  Lwt_list.iter_s print_result results
+
+let () =
+  let servers = ref ["api.duckduckgo.com"]
+  and words = ref [] in
+  let options = [
+    "-servers",
+    Arg.String (fun s -> servers := String.split_on_char ',' s),
+    "Specify servers to connect to";
+  ] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [word ...]" in
+  Arg.parse options (fun w -> words := w :: !words) usage;
+  words := List.rev !words;
+
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (search_and_print ~servers:!servers !words)
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
