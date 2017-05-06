@@ -495,6 +495,11 @@ let handle_error () =
 ```
 
 
+### Monitors
+
+Lwt does not have a concept corresponding to a monitor.
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
