@@ -305,6 +305,7 @@ let search_and_print ~(servers : string list) (timeout : float) (words : string 
   in
   Lwt_list.iter_s print_result results
 
+(*
 let () =
   let servers = ref ["api.duckduckgo.com"]
   and timeout = ref 5.0
@@ -324,3 +325,30 @@ let () =
   (try Lwt_engine.set (new Lwt_engine.libev ())
    with Lwt_sys.Not_available _ -> ());
   Lwt_main.run (search_and_print ~servers:!servers !timeout !words)
+*)
+
+
+(* Working with System Threads *)
+
+let rec every ?(stop : unit Lwt.t = never_terminate) (span : float) (f : unit -> unit Lwt.t) : unit Lwt.t =
+  if Lwt.is_sleeping stop then
+    f () >> Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] >>
+    every ~stop span f
+  else Lwt.return_unit
+
+let log_delays (thunk : unit -> unit Lwt.t) : unit Lwt.t =
+  let start = Unix.gettimeofday () in
+  let print_time () =
+    let diff = Unix.gettimeofday () -. start in
+    Lwt_io.printf "%f, " diff
+  in
+  let d = thunk () in
+  every 0.1 ~stop:d print_time >>
+  d >> print_time () >> Lwt_io.print "\n"
+
+let noalloc_busy_loop () : unit =
+  for _i = 0 to 10_000_000_000 do () done
+
+let () =
+  Lwt_main.run
+  @@ log_delays (fun () -> Lwt_preemptive.detach noalloc_busy_loop ())

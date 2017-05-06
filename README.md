@@ -662,6 +662,90 @@ let () =
 `Cohttp_lwt_unix.Client.get` does not take the labeled `~interrupt` argument unlike `Cohttp_async.Client.get`. However, the thread that `Cohttp_lwt_unix.Client.get` returns is [cancelable](https://ocsigen.org/lwt/3.0.0/api/Lwt#2_Cancelablethreads) and can be naturally used with `Lwt.pick`.
 
 
+## Working with System Threads
+
+#### OCaml utop (part 42)
+
+```ocaml
+# let rec range ?(acc = []) start stop =
+    if start >= stop then List.rev acc
+    else range ~acc:(start :: acc) (start + 1) stop;;
+val range : ?acc:int list -> int -> int -> int list = <fun>
+# let def = Lwt_preemptive.detach (fun () -> range 1 10) ();;
+val def : int list Lwt.t = <abstr>
+# def;;
+- : int list = [1; 2; 3; 4; 5; 6; 7; 8; 9]
+```
+
+#### OCaml utop (part 43)
+
+```ocaml
+# let rec every ?(stop = never_terminate) span (f : unit -> unit Lwt.t) : unit Lwt.t =
+    if Lwt.is_sleeping stop then
+      f () >> Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] >>
+      every ~stop span f
+    else Lwt.return_unit;;
+val every : ?stop:unit Lwt.t -> float -> (unit -> unit Lwt.t) -> unit Lwt.t = <fun>
+# let log_delays thunk =
+    let start = Unix.gettimeofday () in
+    let print_time () =
+      let diff = Unix.gettimeofday () -. start in
+      Lwt_io.printf "%f, " diff
+    in
+    let d = thunk () in
+    every 0.1 ~stop:d print_time >>
+    d >> print_time () >> Lwt_io.print "\n"
+val log_delays : (unit -> unit Lwt.t) -> unit Lwt.t = <fun>
+```
+
+#### OCaml utop
+
+```ocaml
+# log_delays (fun () -> Lwt_unix.sleep 0.5);;
+0.000006, 0.101822, 0.201969, 0.306260, 0.411472, 0.505199,
+```
+
+#### OCalm utop
+
+```ocaml
+# let busy_loop () =
+    let x = ref None in
+    for i = 1 to 500_000_000 do x := Some i done;;
+val busy_loop : unit -> unit = <fun>
+# log_delays (fun () -> Lwt.return (busy_loop ()));;
+6.890156,
+- : unit = ()
+```
+
+#### OCaml utop
+
+```ocaml
+# log_delays (fun () -> Lwt_preemptive.detach busy_loop ());;
+0.000033, 0.158420, 0.264950, 0.370093, 0.475191, 0.585002, 0.685192, 0.786619,
+0.894304, 0.997954, 1.103635, 1.213693, 1.316856, 1.426929, 1.583395, 1.686367,
+1.786517, 1.894609, 1.998529, 2.103606, 2.208725, 2.363542, 2.571035, 2.680959,
+2.945979, 3.056136, 3.161278, 3.430440, 3.531169, 3.742274, 3.847282, 3.951309,
+4.114742, 4.215642, 4.315771, 4.421812, 4.530823, 4.741970, 4.848297, 5.008062,
+5.114670, 5.430785, 5.535985, 5.644637, 5.802193, 6.015593, 6.226784, 6.330944,
+6.546150, 6.703104, 6.806751, 6.912780, 6.992610,
+- : unit = ()
+```
+
+#### OCaml utop
+
+```ocaml
+# let noallc_busy_loop () =
+    for _i = 0 to 500_000_000 do () done;;
+val noallc_busy_loop : unit -> unit = <fun>
+# log_delays (fun () -> Lwt_preemptive.detach noallc_busy_loop ());;
+0.000010, 0.137578, 0.240112, 0.345218, 0.450686, 0.555763, 0.660168, 0.766587,
+0.872521, 0.977615, 1.078819, 1.184021, 1.289587, 1.394786, 1.552426, 1.657563,
+1.764036, 1.922921, 2.078783, 2.287458, 2.501932, 2.663988, 2.768908, 2.978174,
+3.188819, 3.297128, 3.460475, 3.568800, 3.670217, 3.803641, 3.803730,
+- : unit = ()
+```
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.

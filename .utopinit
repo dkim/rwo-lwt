@@ -10,10 +10,12 @@ let () =
 (* Findlib *)
 #use "topfind";;
 (* #topfind_verbose true;; *)
+#thread;;
 
 #require "cohttp.lwt";;
 
 #require "lwt.ppx";;
+#require "lwt.preemptive";;
 
 #require "yojson";;
 

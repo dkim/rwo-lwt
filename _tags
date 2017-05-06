@@ -1,5 +1,9 @@
+# Compile or link multithreaded programs, in combination with the system
+# "threads" library.
+true: thread
+
 true: package(cohttp.lwt)
-true: package(lwt.ppx)
+true: package(lwt.ppx), package(lwt.preemptive)
 true: package(yojson)
 
 # Save typedtree in <filename>.cmt.

@@ -6,7 +6,7 @@ S %{prefix}%/build/cohttp.*/_build/lib
 S %{prefix}%/build/cohttp.*/_build/lwt
 S %{prefix}%/build/cohttp.*/_build/lwt-core
 
-PKG lwt.ppx
+PKG lwt.ppx lwt.preemptive
 S %{prefix}%/build/lwt.*/_build/src/*
 
 S %{prefix}%/build/uri.*/_build/lib
@@ -16,6 +16,9 @@ S %{prefix}%/build/yojson.*
 
 # Shorten paths in types.
 FLG -short-paths
+
+# Add support for system threads library
+FLG -thread
 
 #  4 Fragile pattern matching: matching that will remain complete even if
 #    additional constructors are added to one of the variant types matched.
