@@ -222,12 +222,14 @@ let query_uri ~(server : string) (query : string) : Uri.t =
   in
   Uri.add_query_param base_uri ("q", [query])
 
+(*
 let get_definition ~(server : string) (word : string) : (string * (string option, string) result) Lwt.t =
   try%lwt
     let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri ~server word) in
     let%lwt body' = Cohttp_lwt_body.to_string body in
     Lwt.return (word, Ok (get_definition_from_json body'))
   with _ -> Lwt.return (word, Error "Unexpected failure")
+*)
 
 let print_result ((word, definition) : string * (string option, string) result) : unit Lwt.t =
   Lwt_io.printf "%s\n%s\n\n%s\n\n"
@@ -241,6 +243,7 @@ let print_result ((word, definition) : string * (string option, string) result) 
        Format.pp_print_text Format.str_formatter def;
        Format.flush_str_formatter ())
 
+(*
 let search_and_print ~(servers : string list) (words : string list) : unit Lwt.t =
   let servers = Array.of_list servers in
   let%lwt results =
@@ -267,3 +270,57 @@ let () =
   (try Lwt_engine.set (new Lwt_engine.libev ())
    with Lwt_sys.Not_available _ -> ());
   Lwt_main.run (search_and_print ~servers:!servers !words)
+*)
+
+
+(* Timeouts, Cancellation, and Choices *)
+
+let get_definition ~(server : string) (word : string) : (string * (string option, exn) result) Lwt.t =
+  try%lwt
+    let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri ~server word) in
+    let%lwt body' = Cohttp_lwt_body.to_string body in
+    Lwt.return (word, Ok (get_definition_from_json body'))
+  with exn -> Lwt.return (word, Error exn)
+
+let get_definition_with_timeout ~(server : string) (timeout : float) (word : string) : (string * (string option, string) result) Lwt.t =
+  Lwt.pick [
+    (Lwt_unix.sleep timeout >> Lwt.return (word, Error "Timed out"));
+    (let%lwt word, result = get_definition ~server word in
+     let result' =
+       match result with
+       | Ok _ as x -> x
+       | Error _ -> Error "Unexpected failure"
+     in
+     Lwt.return (word, result'));
+  ]
+
+let search_and_print ~(servers : string list) (timeout : float) (words : string list) : unit Lwt.t =
+  let servers = Array.of_list servers in
+  let%lwt results =
+    Lwt_list.mapi_p
+      (fun i word ->
+         let server = servers.(i mod Array.length servers) in
+         get_definition_with_timeout  ~server timeout word)
+      words
+  in
+  Lwt_list.iter_s print_result results
+
+let () =
+  let servers = ref ["api.duckduckgo.com"]
+  and timeout = ref 5.0
+  and words = ref [] in
+  let options = [
+    "-servers",
+    Arg.String (fun s -> servers := String.split_on_char ',' s),
+    "Specify servers to connect to";
+    "-timeout",
+    Arg.Set_float timeout,
+    "Abandon queries that take longer than this time";
+  ] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
+  Arg.parse options (fun w -> words := w :: !words) usage;
+  words := List.rev !words;
+
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (search_and_print ~servers:!servers !timeout !words)

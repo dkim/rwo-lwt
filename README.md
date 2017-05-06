@@ -569,6 +569,99 @@ let () =
 ```
 
 
+## Timeouts, Cancellation, and Choices
+
+#### OCaml utop (part 39)
+
+```ocaml
+# let both x y =
+    let%lwt x' = x
+    and y' = y in
+    Lwt.return (x', y');;
+val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t = <fun>
+# let string_and_float =
+    both
+      (Lwt_unix.sleep 0.5 >> Lwt.return "A")
+      (Lwt_unix.sleep 0.25 >> Lwt.return 32.33);;
+val string_and_float : (string * float) Lwt.t = <abstr>
+# string_and_float;;
+- : string * float = ("A", 32.33)
+```
+
+#### OCaml utop (part 40)
+
+```ocaml
+# Lwt.choose [
+    (Lwt_unix.sleep 0.5 >> Lwt.return "half a second");
+    (Lwt_unix.sleep 10. >> Lwt.return "ten seconds");
+  ];;
+- : string = "half a second"
+```
+
+#### OCaml utop (part 41)
+
+```ocaml
+# Lwt.pick;;
+- : 'a Lwt.t list -> 'a Lwt.t = <fun>
+```
+
+#### OCaml (parts 1 and 2)
+
+```ocaml
+let get_definition ~server word =
+  try%lwt
+    let%lwt _resp, body = Cohttp_lwt_unix.Client.get (query_uri ~server word) in
+    let%lwt body' = Cohttp_lwt_body.to_string body in
+    Lwt.return (word, Ok (get_definition_from_json body'))
+  with exn -> Lwt.return (word, Error exn)
+
+let get_definition_with_timeout ~server timeout word =
+  Lwt.pick [
+    (Lwt_unix.sleep timeout >> Lwt.return (word, Error "Timed out"));
+    (let%lwt word, result = get_definition ~server word in
+     let result' =
+       match result with
+       | Ok _ as x -> x
+       | Error _ -> Error "Unexpected failure"
+     in
+     Lwt.return (word, result'));
+  ]
+
+let search_and_print ~servers timeout words =
+  let servers = Array.of_list servers in
+  let%lwt results =
+    Lwt_list.mapi_p
+      (fun i word ->
+         let server = servers.(i mod Array.length servers) in
+         get_definition_with_timeout  ~server timeout word)
+      words
+  in
+  Lwt_list.iter_s print_result results
+
+let () =
+  let servers = ref ["api.duckduckgo.com"]
+  and timeout = ref 5.0
+  and words = ref [] in
+  let options = [
+    "-servers",
+    Arg.String (fun s -> servers := String.split_on_char ',' s),
+    "Specify servers to connect to";
+    "-timeout",
+    Arg.Set_float timeout,
+    "Abandon queries that take longer than this time";
+  ] in
+  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
+  Arg.parse options (fun w -> words := w :: !words) usage;
+  words := List.rev !words;
+
+  (try Lwt_engine.set (new Lwt_engine.libev ())
+   with Lwt_sys.Not_available _ -> ());
+  Lwt_main.run (search_and_print ~servers:!servers !timeout !words)
+```
+
+`Cohttp_lwt_unix.Client.get` does not take the labeled `~interrupt` argument unlike `Cohttp_async.Client.get`. However, the thread that `Cohttp_lwt_unix.Client.get` returns is [cancelable](https://ocsigen.org/lwt/3.0.0/api/Lwt#2_Cancelablethreads) and can be naturally used with `Lwt.pick`.
+
+
 ---
 
 <a name="backtrace">1</a>. It has been [reported](https://github.com/ocsigen/lwt/issues/171) that the backtrace mechanism appears not to work well with the recent versions of OCaml. For the present, the choice between the Ppx constructs and the regular functions (or operators) may be more a matter of style.
