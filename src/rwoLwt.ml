@@ -133,7 +133,7 @@ let () =
        "num Port to listen on (default 8765)");
     ]
   in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-uppercase] [-port num]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-uppercase] [-port num]" in
   Arg.parse
     options
     (fun arg -> raise (Arg.Bad (Printf.sprintf "invalid argument -- '%s'" arg)))
@@ -209,7 +209,7 @@ let search_and_print (words : string list) : unit Lwt.t =
 
 let () =
   let words = ref [] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [word ...]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [word ...]" in
   Arg.parse [] (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -270,7 +270,7 @@ let () =
        "s1,...,sn Specify servers to connect to");
     ]
   in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [word ...]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -327,7 +327,7 @@ let () =
        "secs Abandon queries that take longer than this time");
     ]
   in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
