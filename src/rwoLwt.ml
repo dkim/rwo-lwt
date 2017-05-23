@@ -123,11 +123,17 @@ let run (uppercase : bool) (port : int) : unit Lwt.t =
 let () =
   let uppercase = ref false
   and port = ref 8765 in
-  let options = [
-    "-uppercase", Arg.Set uppercase, "Convert to uppercase before echoing back";
-    "-port", Arg.Set_int port, "Port to listen on (default 8765)";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-uppercase] [-port num]" in
+  let options =
+    Arg.align [
+      ("-uppercase",
+       Arg.Set uppercase,
+       " Convert to uppercase before echoing back");
+      ("-port",
+       Arg.Set_int port,
+       "num Port to listen on (default 8765)");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-uppercase] [-port num]" in
   Arg.parse
     options
     (fun arg -> raise (Arg.Bad (Printf.sprintf "invalid argument -- '%s'" arg)))
@@ -203,7 +209,7 @@ let search_and_print (words : string list) : unit Lwt.t =
 
 let () =
   let words = ref [] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [word ...]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [word ...]" in
   Arg.parse [] (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -257,12 +263,14 @@ let search_and_print ~(servers : string list) (words : string list) : unit Lwt.t
 let () =
   let servers = ref ["api.duckduckgo.com"]
   and words = ref [] in
-  let options = [
-    "-servers",
-    Arg.String (fun s -> servers := String.split_on_char ',' s),
-    "Specify servers to connect to";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [word ...]" in
+  let options =
+    Arg.align [
+      ("-servers",
+       Arg.String (fun s -> servers := String.split_on_char ',' s),
+       "s1,...,sn Specify servers to connect to");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -309,15 +317,17 @@ let () =
   let servers = ref ["api.duckduckgo.com"]
   and timeout = ref 5.0
   and words = ref [] in
-  let options = [
-    "-servers",
-    Arg.String (fun s -> servers := String.split_on_char ',' s),
-    "Specify servers to connect to";
-    "-timeout",
-    Arg.Set_float timeout,
-    "Abandon queries that take longer than this time";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
+  let options =
+    Arg.align [
+      ("-servers",
+       Arg.String (fun s -> servers := String.split_on_char ',' s),
+       "s1,...,sn Specify servers to connect to");
+      ("-timeout",
+       Arg.Set_float timeout,
+       "secs Abandon queries that take longer than this time");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
