@@ -321,11 +321,10 @@ let get_definition_from_json json =
   match Yojson.Safe.from_string json with
   | `Assoc kv_list ->
     let find key =
-      try
-        match List.assoc key kv_list with
-        | `String "" -> None
-        | s -> Some (Yojson.Safe.to_string s)
-      with Not_found -> None
+      match List.assoc key kv_list with
+      | exception Not_found -> None
+      | `String "" -> None
+      | s -> Some (Yojson.Safe.to_string s)
     in
     begin match find "Abstract" with
     | Some _ as x -> x
