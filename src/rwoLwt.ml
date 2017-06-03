@@ -62,7 +62,8 @@ let rec copy_blocks (buffer : bytes) (r : Lwt_io.input_channel) (w : Lwt_io.outp
   match%lwt Lwt_io.read_into r buffer 0 (Bytes.length buffer) with
   | 0 -> Lwt.return_unit
   | bytes_read ->
-    Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
+    let%lwt () = Lwt_io.write_from_exactly w buffer 0 bytes_read in
+    copy_blocks buffer r w
 
 (*
 let run () : unit =
@@ -291,7 +292,8 @@ let get_definition ~(server : string) (word : string) : (string * (string option
 
 let get_definition_with_timeout ~(server : string) (timeout : float) (word : string) : (string * (string option, string) result) Lwt.t =
   Lwt.pick [
-    (Lwt_unix.sleep timeout >> Lwt.return (word, Error "Timed out"));
+    (let%lwt () = Lwt_unix.sleep timeout in
+     Lwt.return (word, Error "Timed out"));
     (let%lwt word, result = get_definition ~server word in
      let result' =
        match result with
@@ -341,7 +343,8 @@ let () =
 
 let rec every ?(stop : unit Lwt.t = never_terminate) (span : float) (f : unit -> unit Lwt.t) : unit Lwt.t =
   if Lwt.is_sleeping stop then
-    f () >> Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] >>
+    let%lwt () = f () in
+    let%lwt () = Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] in
     every ~stop span f
   else Lwt.return_unit
 
@@ -352,8 +355,10 @@ let log_delays (thunk : unit -> unit Lwt.t) : unit Lwt.t =
     Lwt_io.printf "%f, " diff
   in
   let d = thunk () in
-  every 0.1 ~stop:d print_time >>
-  d >> print_time () >> Lwt_io.print "\n"
+  let%lwt () = every 0.1 ~stop:d print_time in
+  let%lwt () = d in
+  let%lwt () = print_time () in
+  Lwt_io.print "\n"
 
 let noalloc_busy_loop () : unit =
   for _i = 0 to 10_000_000_000 do () done
