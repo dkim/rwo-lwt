@@ -202,8 +202,11 @@ let rec copy_blocks buffer r w =
   match%lwt Lwt_io.read_into r buffer 0 (Bytes.length buffer) with
   | 0 -> Lwt.return_unit
   | bytes_read ->
-    Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
+    let%lwt () = Lwt_io.write_from_exactly w buffer 0 bytes_read in
+    copy_blocks buffer r w
 ```
+
+`let%lwt () = e1 in e2` can be shortened to [`e1 >> e2`](https://ocsigen.org/lwt/3.0.0/api/Ppx_lwt#2_Sequence), but `>>` will get [deprecated](https://github.com/ocsigen/lwt/issues/387) in the near future.
 
 #### OCaml (part 1)
 
@@ -432,7 +435,7 @@ let () =
     fun () ->
       let will_fail = !should_fail in
       should_fail := not will_fail;
-      Lwt_unix.sleep 0.5 >>
+      let%lwt () = Lwt_unix.sleep 0.5 in
       if will_fail then [%lwt raise Exit] else Lwt.return_unit;;
 val maybe_raise : unit -> unit Lwt.t = <fun>
 # maybe_raise ();;
@@ -461,7 +464,8 @@ Note that I wrote `[%lwt raise Exit]` rather than `Lwt.fail Exit`. The Lwt manua
 ```ocaml
 # let handle_error () =
     try
-      maybe_raise () >> Lwt.return "success"
+      let%lwt () = maybe_raise () in
+      Lwt.return "success"
     with _ -> Lwt.return "failure";;
 val handle_error : unit -> string Lwt.t = <fun>
 # handle_error ();;
@@ -478,7 +482,8 @@ Called from file "toplevel/toploop.ml", line 180, characters 17-56
 ```ocaml
 # let handle_error () =
     try%lwt
-      maybe_raise () >> Lwt.return "success"
+      let%lwt () = maybe_raise () in
+      Lwt.return "success"
     with _ -> Lwt.return "failure";;
 val handle_error : unit -> string Lwt.t = <fun>
 # handle_error ();;
@@ -588,8 +593,10 @@ let () =
 val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t = <fun>
 # let string_and_float =
     both
-      (Lwt_unix.sleep 0.5 >> Lwt.return "A")
-      (Lwt_unix.sleep 0.25 >> Lwt.return 32.33);;
+      (let%lwt () = Lwt_unix.sleep 0.5 in
+       Lwt.return "A")
+      (let%lwt () = Lwt_unix.sleep 0.25 in
+       Lwt.return 32.33);;
 val string_and_float : (string * float) Lwt.t = <abstr>
 # string_and_float;;
 - : string * float = ("A", 32.33)
@@ -599,8 +606,10 @@ val string_and_float : (string * float) Lwt.t = <abstr>
 
 ```ocaml
 # Lwt.choose [
-    (Lwt_unix.sleep 0.5 >> Lwt.return "half a second");
-    (Lwt_unix.sleep 10. >> Lwt.return "ten seconds");
+    (let%lwt () = Lwt_unix.sleep 0.5 in
+     Lwt.return "half a second");
+    (let%lwt () = Lwt_unix.sleep 10. in
+     Lwt.return "ten seconds");
   ];;
 - : string = "half a second"
 ```
@@ -624,7 +633,8 @@ let get_definition ~server word =
 
 let get_definition_with_timeout ~server timeout word =
   Lwt.pick [
-    (Lwt_unix.sleep timeout >> Lwt.return (word, Error "Timed out"));
+    (let%lwt () = Lwt_unix.sleep timeout in
+     Lwt.return (word, Error "Timed out"));
     (let%lwt word, result = get_definition ~server word in
      let result' =
        match result with
@@ -691,7 +701,8 @@ val def : int list Lwt.t = <abstr>
 ```ocaml
 # let rec every ?(stop = never_terminate) span (f : unit -> unit Lwt.t) : unit Lwt.t =
     if Lwt.is_sleeping stop then
-      f () >> Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] >>
+      let%lwt () = f () in
+      let%lwt () = Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] in
       every ~stop span f
     else Lwt.return_unit;;
 val every : ?stop:unit Lwt.t -> float -> (unit -> unit Lwt.t) -> unit Lwt.t = <fun>
@@ -702,8 +713,10 @@ val every : ?stop:unit Lwt.t -> float -> (unit -> unit Lwt.t) -> unit Lwt.t = <f
       Lwt_io.printf "%f, " diff
     in
     let d = thunk () in
-    every 0.1 ~stop:d print_time >>
-    d >> print_time () >> Lwt_io.print "\n"
+    let%lwt () = every 0.1 ~stop:d print_time in
+    let%lwt () = d in
+    let%lwt () = print_time () in
+    Lwt_io.print "\n";;
 val log_delays : (unit -> unit Lwt.t) -> unit Lwt.t = <fun>
 ```
 
