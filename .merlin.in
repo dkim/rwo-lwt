@@ -14,8 +14,20 @@ S %{prefix}%/build/uri.*/_build/lib
 PKG yojson
 S %{prefix}%/build/yojson.*
 
+# Check principality of type inference
+FLG -principal
+
+# Make strings immutable.
+FLG -safe-string
+
 # Shorten paths in types.
 FLG -short-paths
+
+# Reject invalid formats accepted by legacy implementations.
+FLG -strict-formats
+
+# Left-hand part of a sequence must have type unit.
+FLG -strict-sequence
 
 # Add support for system threads library
 FLG -thread

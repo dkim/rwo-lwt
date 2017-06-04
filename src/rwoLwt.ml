@@ -62,7 +62,8 @@ let rec copy_blocks (buffer : bytes) (r : Lwt_io.input_channel) (w : Lwt_io.outp
   match%lwt Lwt_io.read_into r buffer 0 (Bytes.length buffer) with
   | 0 -> Lwt.return_unit
   | bytes_read ->
-    Lwt_io.write_from_exactly w buffer 0 bytes_read >> copy_blocks buffer r w
+    let%lwt () = Lwt_io.write_from_exactly w buffer 0 bytes_read in
+    copy_blocks buffer r w
 
 (*
 let run () : unit =
@@ -123,11 +124,17 @@ let run (uppercase : bool) (port : int) : unit Lwt.t =
 let () =
   let uppercase = ref false
   and port = ref 8765 in
-  let options = [
-    "-uppercase", Arg.Set uppercase, "Convert to uppercase before echoing back";
-    "-port", Arg.Set_int port, "Port to listen on (default 8765)";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-uppercase] [-port num]" in
+  let options =
+    Arg.align [
+      ("-uppercase",
+       Arg.Set uppercase,
+       " Convert to uppercase before echoing back");
+      ("-port",
+       Arg.Set_int port,
+       "num Port to listen on (default 8765)");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-uppercase] [-port num]" in
   Arg.parse
     options
     (fun arg -> raise (Arg.Bad (Printf.sprintf "invalid argument -- '%s'" arg)))
@@ -157,11 +164,10 @@ let get_definition_from_json (json : string) : string option =
   match Yojson.Safe.from_string json with
   | `Assoc kv_list ->
     let find key =
-      try
-        match List.assoc key kv_list with
-        | `String "" -> None
-        | s -> Some (Yojson.Safe.to_string s)
-      with Not_found -> None
+      match List.assoc key kv_list with
+      | exception Not_found -> None
+      | `String "" -> None
+      | s -> Some (Yojson.Safe.to_string s)
     in
     begin match find "Abstract" with
     | Some _ as x -> x
@@ -204,7 +210,7 @@ let search_and_print (words : string list) : unit Lwt.t =
 
 let () =
   let words = ref [] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [word ...]" in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [word ...]" in
   Arg.parse [] (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -258,12 +264,14 @@ let search_and_print ~(servers : string list) (words : string list) : unit Lwt.t
 let () =
   let servers = ref ["api.duckduckgo.com"]
   and words = ref [] in
-  let options = [
-    "-servers",
-    Arg.String (fun s -> servers := String.split_on_char ',' s),
-    "Specify servers to connect to";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [word ...]" in
+  let options =
+    Arg.align [
+      ("-servers",
+       Arg.String (fun s -> servers := String.split_on_char ',' s),
+       "s1,...,sn Specify servers to connect to");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -284,7 +292,8 @@ let get_definition ~(server : string) (word : string) : (string * (string option
 
 let get_definition_with_timeout ~(server : string) (timeout : float) (word : string) : (string * (string option, string) result) Lwt.t =
   Lwt.pick [
-    (Lwt_unix.sleep timeout >> Lwt.return (word, Error "Timed out"));
+    (let%lwt () = Lwt_unix.sleep timeout in
+     Lwt.return (word, Error "Timed out"));
     (let%lwt word, result = get_definition ~server word in
      let result' =
        match result with
@@ -310,15 +319,17 @@ let () =
   let servers = ref ["api.duckduckgo.com"]
   and timeout = ref 5.0
   and words = ref [] in
-  let options = [
-    "-servers",
-    Arg.String (fun s -> servers := String.split_on_char ',' s),
-    "Specify servers to connect to";
-    "-timeout",
-    Arg.Set_float timeout,
-    "Abandon queries that take longer than this time";
-  ] in
-  let usage = "Usage: " ^ Sys.argv.(0) ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
+  let options =
+    Arg.align [
+      ("-servers",
+       Arg.String (fun s -> servers := String.split_on_char ',' s),
+       "s1,...,sn Specify servers to connect to");
+      ("-timeout",
+       Arg.Set_float timeout,
+       "secs Abandon queries that take longer than this time");
+    ]
+  in
+  let usage = "Usage: " ^ Sys.executable_name ^ " [-servers s1,...,sn] [-timeout secs] [word ...]" in
   Arg.parse options (fun w -> words := w :: !words) usage;
   words := List.rev !words;
 
@@ -332,7 +343,8 @@ let () =
 
 let rec every ?(stop : unit Lwt.t = never_terminate) (span : float) (f : unit -> unit Lwt.t) : unit Lwt.t =
   if Lwt.is_sleeping stop then
-    f () >> Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] >>
+    let%lwt () = f () in
+    let%lwt () = Lwt.pick [Lwt_unix.sleep span; Lwt.protected stop] in
     every ~stop span f
   else Lwt.return_unit
 
@@ -343,8 +355,10 @@ let log_delays (thunk : unit -> unit Lwt.t) : unit Lwt.t =
     Lwt_io.printf "%f, " diff
   in
   let d = thunk () in
-  every 0.1 ~stop:d print_time >>
-  d >> print_time () >> Lwt_io.print "\n"
+  let%lwt () = every 0.1 ~stop:d print_time in
+  let%lwt () = d in
+  let%lwt () = print_time () in
+  Lwt_io.print "\n"
 
 let noalloc_busy_loop () : unit =
   for _i = 0 to 10_000_000_000 do () done
