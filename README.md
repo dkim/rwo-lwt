@@ -1,6 +1,6 @@
 # Concurrent Programming with Lwt
 
-Deokhwan Kim - Version v1.0, 2017-05-09
+Deokhwan Kim - Version 1.1.0, 2017-06-03
 
 Below are [Lwt](https://github.com/ocsigen/lwt) translations of [the code examples](https://github.com/realworldocaml/examples) in [Real World OCaml - Chapter 18. Concurrent Programming with Async](https://realworldocaml.org/v1/en/html/concurrent-programming-with-async.html). The section titles follow those in the book for easy cross-reference. Here is the version information of the software components that I have used:
 
